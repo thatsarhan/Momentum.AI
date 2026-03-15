@@ -30,7 +30,7 @@ export const generateQuiz = async (topic: string, level: number) => {
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-pro-preview',
+      model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -72,7 +72,7 @@ export const chatWithMentor = async (message: string, history: any[] = []) => {
     });
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-pro-preview',
+      model: 'gemini-3-flash-preview',
       contents: contents,
       config: {
         systemInstruction: "You are Momentum AI, an expert NID (National Institute of Design) mentor. You help students with design thinking, drawing techniques, and exam strategy. Be encouraging, insightful, and concise.",

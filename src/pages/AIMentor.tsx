@@ -115,7 +115,7 @@ export function AIMentor() {
             </div>
             <div className="p-4 bg-white border border-stone-200 shadow-sm rounded-2xl rounded-tl-sm flex items-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
-              <span className="text-sm text-stone-500">Thinking deeply...</span>
+              <span className="text-sm text-stone-500">Generating response...</span>
             </div>
           </div>
         )}
