@@ -30,7 +30,7 @@ export const generateQuiz = async (topic: string, level: number) => {
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-3.1-pro-preview',
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -53,8 +53,13 @@ export const chatWithMentor = async (message: string, history: any[] = []) => {
   try {
     const ai = getGeminiClient();
     
-    // Filter out the initial AI greeting to ensure the history starts with a user message
-    const validHistory = history.filter((msg, index) => !(index === 0 && msg.role === 'ai'));
+    // Filter out the initial AI greeting and any error messages
+    const validHistory = history.filter((msg, index) => {
+      if (index === 0 && msg.role === 'ai') return false;
+      if (msg.role === 'ai' && msg.content.includes('Error:')) return false;
+      if (msg.role === 'ai' && msg.content.includes('error connecting')) return false;
+      return true;
+    });
 
     const contents = validHistory.map(msg => ({
       role: msg.role === 'ai' ? 'model' : 'user',
@@ -67,10 +72,10 @@ export const chatWithMentor = async (message: string, history: any[] = []) => {
     });
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-3.1-pro-preview',
       contents: contents,
       config: {
-        systemInstruction: "You are Midhun AI, an expert NID (National Institute of Design) mentor. You help students with design thinking, drawing techniques, and exam strategy. Be encouraging, insightful, and concise.",
+        systemInstruction: "You are Momentum AI, an expert NID (National Institute of Design) mentor. You help students with design thinking, drawing techniques, and exam strategy. Be encouraging, insightful, and concise.",
       }
     });
 

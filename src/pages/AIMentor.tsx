@@ -11,7 +11,7 @@ interface Message {
 
 export function AIMentor() {
   const [messages, setMessages] = useState<Message[]>([
-    { id: '1', role: 'ai', content: 'Hello! I am Midhun AI, your personal NID Mentor. I can help you with design thinking, critique your ideas, or explain complex concepts. What would you like to discuss today?' }
+    { id: '1', role: 'ai', content: 'Hello! I am Momentum AI, your personal NID Mentor. I can help you with design thinking, critique your ideas, or explain complex concepts. What would you like to discuss today?' }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -37,8 +37,8 @@ export function AIMentor() {
     try {
       const response = await chatWithMentor(userMsg.content, messages);
       setMessages(prev => [...prev, { id: Date.now().toString(), role: 'ai', content: response }]);
-    } catch (error) {
-      setMessages(prev => [...prev, { id: Date.now().toString(), role: 'ai', content: 'Sorry, I encountered an error connecting to my brain. Please try again.' }]);
+    } catch (error: any) {
+      setMessages(prev => [...prev, { id: Date.now().toString(), role: 'ai', content: `Error: ${error.message || 'Failed to connect. Please try again.'}` }]);
     } finally {
       setIsLoading(false);
     }
@@ -60,7 +60,7 @@ export function AIMentor() {
             <Bot className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="font-bold text-stone-900">Midhun AI</h2>
+            <h2 className="font-bold text-stone-900">Momentum AI</h2>
             <p className="text-xs text-emerald-600 font-medium flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
               Online

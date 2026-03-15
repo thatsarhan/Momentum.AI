@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { format, subDays, eachDayOfInterval, isSameDay, parseISO, startOfWeek, endOfWeek } from 'date-fns';
 import { Habit, DailyLog, EffortLevel } from '../types';
 import { Trophy, Flame, Target, TrendingUp, Calendar as CalendarIcon, Zap, ArrowRight, CheckCircle2, Activity } from 'lucide-react';
+import { CalendarView } from './CalendarView';
 
 interface DashboardProps {
   habits: Habit[];
@@ -287,6 +288,11 @@ export function Dashboard({ habits, logs, onDateSelect, onStartChallenge, challe
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Full Month Calendar View */}
+      <div className="mt-8">
+        <CalendarView logs={logs} onDateSelect={onDateSelect} />
       </div>
     </div>
   );

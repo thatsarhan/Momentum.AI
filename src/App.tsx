@@ -386,7 +386,7 @@ export default function App() {
           <NavItem icon={<Trophy />} label="Leaderboard" active={currentTab === 'leaderboard'} onClick={() => setCurrentTab('leaderboard')} />
           <NavItem icon={<BrainCircuit />} label="Daily Quiz" active={currentTab === 'quiz'} onClick={() => setCurrentTab('quiz')} />
           <NavItem icon={<PenTool />} label="Drawing Studio" active={currentTab === 'drawing'} onClick={() => setCurrentTab('drawing')} />
-          <NavItem icon={<MessageSquare />} label="Midhun AI" active={currentTab === 'mentor'} onClick={() => setCurrentTab('mentor')} />
+          <NavItem icon={<MessageSquare />} label="Momentum AI" active={currentTab === 'mentor'} onClick={() => setCurrentTab('mentor')} />
           <div className="my-4 border-t border-stone-100"></div>
           <NavItem icon={<ListTodo />} label="Habits Setup" active={currentTab === 'habits'} onClick={() => setCurrentTab('habits')} />
         </nav>
