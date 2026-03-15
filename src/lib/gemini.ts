@@ -50,18 +50,33 @@ export const generateQuiz = async (topic: string, level: number) => {
 };
 
 export const chatWithMentor = async (message: string, history: any[] = []) => {
-  const ai = getGeminiClient();
-  const chat = ai.chats.create({
-    model: 'gemini-3-flash-preview',
-    config: {
-      systemInstruction: "You are Midhun AI, an expert NID (National Institute of Design) mentor. You help students with design thinking, drawing techniques, and exam strategy. Be encouraging, insightful, and concise.",
-      tools: [{ googleSearch: {} }], // Enable search grounding for up-to-date info
-    }
-  });
+  try {
+    const ai = getGeminiClient();
+    
+    // Filter out the initial AI greeting to ensure the history starts with a user message
+    const validHistory = history.filter((msg, index) => !(index === 0 && msg.role === 'ai'));
 
-  // Replay history (simplified for this example, ideally we'd pass the actual history objects)
-  // In a real app, we'd map the history to the format expected by the SDK.
-  
-  const response = await chat.sendMessage({ message });
-  return response.text;
+    const contents = validHistory.map(msg => ({
+      role: msg.role === 'ai' ? 'model' : 'user',
+      parts: [{ text: msg.content }]
+    }));
+    
+    contents.push({
+      role: 'user',
+      parts: [{ text: message }]
+    });
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: contents,
+      config: {
+        systemInstruction: "You are Midhun AI, an expert NID (National Institute of Design) mentor. You help students with design thinking, drawing techniques, and exam strategy. Be encouraging, insightful, and concise.",
+      }
+    });
+
+    return response.text || "I'm sorry, I couldn't generate a response.";
+  } catch (error) {
+    console.error("Error in chatWithMentor:", error);
+    throw error;
+  }
 };
