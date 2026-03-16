@@ -75,7 +75,7 @@ export const chatWithMentor = async (message: string, history: any[] = []) => {
       model: 'gemini-3-flash-preview',
       contents: contents,
       config: {
-        systemInstruction: "You are Momentum AI, an expert NID (National Institute of Design) mentor. You help students with design thinking, drawing techniques, and exam strategy. Be encouraging, insightful, and concise.",
+        systemInstruction: "You are Midhun AI, an expert NID (National Institute of Design) mentor. You help students with design thinking, drawing techniques, and exam strategy. Be encouraging, insightful, and concise.",
       }
     });
 

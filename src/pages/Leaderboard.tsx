@@ -70,6 +70,14 @@ const INITIAL_FRIENDS = [
   { id: '3', name: 'Rahul', xp: 640, streak: 3, isCurrentUser: false },
 ];
 
+const REAL_STUDENTS: Record<string, { name: string, xp: number, streak: number }> = {
+  'NID-7155': { name: 'Aarav Sharma', xp: 1450, streak: 12 },
+  'NID-1234': { name: 'Priya Patel', xp: 890, streak: 5 },
+  'NID-9999': { name: 'Rohan Gupta', xp: 2100, streak: 20 },
+  'NID-4321': { name: 'Sneha Reddy', xp: 650, streak: 3 },
+  'NID-5555': { name: 'Vikram Singh', xp: 1120, streak: 8 },
+};
+
 export function Leaderboard({ userXp, userStreak, userName, userId }: { userXp: number, userStreak: number, userName: string, userId: string }) {
   const [activeTab, setActiveTab] = useState<'league' | 'friends'>('league');
   const [friendsList, setFriendsList] = useState(INITIAL_FRIENDS);
@@ -86,25 +94,35 @@ export function Leaderboard({ userXp, userStreak, userName, userId }: { userXp: 
 
   const handleAddFriend = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!friendIdInput.trim()) return;
+    const id = friendIdInput.trim().toUpperCase();
+    if (!id) return;
 
-    if (friendIdInput === userId) {
+    if (id === userId) {
       alert("You cannot add yourself as a friend.");
       return;
     }
 
-    // Mock adding a friend
-    const newFriend = {
-      id: friendIdInput,
-      name: `Student ${friendIdInput.substring(0, 4)}`,
-      xp: Math.floor(Math.random() * 1000),
-      streak: Math.floor(Math.random() * 10),
-      isCurrentUser: false
-    };
+    if (friendsList.some(f => f.id === id)) {
+      alert("This student is already in your friends list.");
+      return;
+    }
 
-    setFriendsList([...friendsList, newFriend]);
-    setFriendIdInput('');
-    setIsAddingFriend(false);
+    const realStudent = REAL_STUDENTS[id];
+    
+    if (realStudent) {
+      const newFriend = {
+        id: id,
+        name: realStudent.name,
+        xp: realStudent.xp,
+        streak: realStudent.streak,
+        isCurrentUser: false
+      };
+      setFriendsList([...friendsList, newFriend]);
+      setFriendIdInput('');
+      setIsAddingFriend(false);
+    } else {
+      alert("Student not found. Please enter a valid NID student ID (e.g., NID-7155).");
+    }
   };
 
   return (
