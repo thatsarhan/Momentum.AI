@@ -1,14 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle2, Lock, Play, Trophy, Flame, Clock, Star, ArrowRight, BookOpen } from 'lucide-react';
-
-const LEADERBOARD = [
-  { name: 'Priya', xp: 2450, streak: 32 },
-  { name: 'Rahul', xp: 2100, streak: 28 },
-  { name: 'Sneha', xp: 1150, streak: 12 },
-  { name: 'Vikram', xp: 900, streak: 5 },
-  { name: 'Arhan', xp: 850, streak: 4 },
-];
+import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
+import { db } from '../firebase';
+import { UserProfile } from '../types';
 
 const LESSON_DATA = [
   { title: 'Introduction to Perspective', type: 'drawing', xp: 150, time: '15m', difficulty: 'Beginner', skills: ['1-Point Perspective', 'Line Weight'] },
@@ -25,6 +20,25 @@ const LESSON_DATA = [
 
 export function Roadmap({ userLevel, onSelectNode }: { userLevel: number, onSelectNode: (type: string) => void }) {
   const [hoveredNode, setHoveredNode] = useState<number | null>(null);
+  const [topUsers, setTopUsers] = useState<UserProfile[]>([]);
+
+  useEffect(() => {
+    const fetchTopUsers = async () => {
+      try {
+        const q = query(collection(db, 'users'), orderBy('xp', 'desc'), limit(5));
+        const querySnapshot = await getDocs(q);
+        const users: UserProfile[] = [];
+        querySnapshot.forEach((doc) => {
+          users.push(doc.data() as UserProfile);
+        });
+        setTopUsers(users);
+      } catch (error) {
+        console.error("Error fetching top users:", error);
+      }
+    };
+
+    fetchTopUsers();
+  }, []);
 
   const nodes = Array.from({ length: 10 }).map((_, i) => {
     const level = i + 1;
@@ -174,8 +188,8 @@ export function Roadmap({ userLevel, onSelectNode }: { userLevel: number, onSele
           </div>
           
           <div className="space-y-3">
-            {LEADERBOARD.map((student, idx) => (
-              <div key={idx} className="flex items-center gap-4 p-3 rounded-2xl hover:bg-stone-50 transition-colors border border-transparent hover:border-stone-100">
+            {topUsers.map((student, idx) => (
+              <div key={student.uid} className="flex items-center gap-4 p-3 rounded-2xl hover:bg-stone-50 transition-colors border border-transparent hover:border-stone-100">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
                   idx === 0 ? 'bg-yellow-100 text-yellow-700 ring-2 ring-yellow-200' :
                   idx === 1 ? 'bg-stone-200 text-stone-700' :

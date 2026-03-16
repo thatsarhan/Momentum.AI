@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Trophy, Flame, Users, Shield, ChevronUp, ChevronDown, Clock, UserPlus, Search, GraduationCap, Rocket, Target, Compass, Star, Sparkles, Crown } from 'lucide-react';
+import { collection, query, orderBy, limit, getDocs, where, doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { db } from '../firebase';
+import { UserProfile } from '../types';
 
 const BADGES = [
   { rank: 1, name: 'Visionary', color: 'text-blue-500', ribbon: 'bg-amber-500', icon: GraduationCap },
@@ -50,80 +53,127 @@ const SpecialBadge = ({ rank }: { rank: number }) => {
   );
 };
 
-// Mock data for the league
-const LEAGUE_USERS = [
-  { id: '1', name: 'Maya', xp: 1250, streak: 14, isCurrentUser: false },
-  { id: '2', name: 'Arjun', xp: 1120, streak: 10, isCurrentUser: false },
-  { id: '3', name: 'Sneha', xp: 980, streak: 8, isCurrentUser: false },
-  { id: '4', name: 'Vikram', xp: 850, streak: 5, isCurrentUser: false },
-  { id: '5', name: 'Priya', xp: 720, streak: 4, isCurrentUser: false },
-  { id: '6', name: 'Rahul', xp: 640, streak: 3, isCurrentUser: false },
-  { id: '7', name: 'Karan', xp: 510, streak: 2, isCurrentUser: false },
-  { id: '8', name: 'Neha', xp: 420, streak: 1, isCurrentUser: false },
-  { id: '9', name: 'Rohan', xp: 310, streak: 1, isCurrentUser: false },
-  { id: '10', name: 'Aditi', xp: 150, streak: 0, isCurrentUser: false },
-];
-
-const INITIAL_FRIENDS = [
-  { id: '1', name: 'Design Studio Team', isGroup: true, xp: 4500 },
-  { id: '2', name: 'Priya', xp: 720, streak: 4, isCurrentUser: false },
-  { id: '3', name: 'Rahul', xp: 640, streak: 3, isCurrentUser: false },
-];
-
-const REAL_STUDENTS: Record<string, { name: string, xp: number, streak: number }> = {
-  'NID-7155': { name: 'Aarav Sharma', xp: 1450, streak: 12 },
-  'NID-1234': { name: 'Priya Patel', xp: 890, streak: 5 },
-  'NID-9999': { name: 'Rohan Gupta', xp: 2100, streak: 20 },
-  'NID-4321': { name: 'Sneha Reddy', xp: 650, streak: 3 },
-  'NID-5555': { name: 'Vikram Singh', xp: 1120, streak: 8 },
-};
-
-export function Leaderboard({ userXp, userStreak, userName, userId }: { userXp: number, userStreak: number, userName: string, userId: string }) {
+export function Leaderboard({ user }: { user: UserProfile }) {
   const [activeTab, setActiveTab] = useState<'league' | 'friends'>('league');
-  const [friendsList, setFriendsList] = useState(INITIAL_FRIENDS);
   const [isAddingFriend, setIsAddingFriend] = useState(false);
   const [friendIdInput, setFriendIdInput] = useState('');
+  const [leagueUsers, setLeagueUsers] = useState<UserProfile[]>([]);
+  const [friendsList, setFriendsList] = useState<UserProfile[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Insert current user into the league
-  const allUsers = [...LEAGUE_USERS, { id: 'me', name: userName, xp: userXp, streak: userStreak, isCurrentUser: true }]
-    .sort((a, b) => b.xp - a.xp);
+  const friendsStr = JSON.stringify(user.friends || []);
 
-  const currentUserRank = allUsers.findIndex(u => u.id === 'me') + 1;
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      try {
+        // Fetch top 50 users globally
+        const q = query(collection(db, 'users'), orderBy('xp', 'desc'), limit(50));
+        const querySnapshot = await getDocs(q);
+        const users: UserProfile[] = [];
+        querySnapshot.forEach((doc) => {
+          users.push(doc.data() as UserProfile);
+        });
+        
+        // Ensure current user is in the list if they aren't in top 50
+        if (!users.some(u => u.uid === user.uid)) {
+          users.push(user);
+          users.sort((a, b) => b.xp - a.xp);
+        }
+        
+        setLeagueUsers(users);
+
+        // Fetch friends
+        if (user.friends && user.friends.length > 0) {
+          // Firestore 'in' query supports up to 10 items. For a real app with more friends,
+          // you'd chunk the queries or fetch them individually.
+          const friendChunks = [];
+          for (let i = 0; i < user.friends.length; i += 10) {
+            friendChunks.push(user.friends.slice(i, i + 10));
+          }
+
+          const fetchedFriends: UserProfile[] = [];
+          for (const chunk of friendChunks) {
+            const friendsQuery = query(collection(db, 'users'), where('uid', 'in', chunk));
+            const friendsSnapshot = await getDocs(friendsQuery);
+            friendsSnapshot.forEach((doc) => {
+              fetchedFriends.push(doc.data() as UserProfile);
+            });
+          }
+          setFriendsList(fetchedFriends);
+        } else {
+          setFriendsList([]);
+        }
+      } catch (error) {
+        console.error("Error fetching leaderboard data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLeaderboard();
+  }, [user.uid, friendsStr, user.xp]); // Re-fetch if user's friends or xp changes
+
+  const currentUserRank = leagueUsers.findIndex(u => u.uid === user.uid) + 1;
   const isPromotionZone = currentUserRank <= 9;
-  const isDemotionZone = currentUserRank >= allUsers.length - 2;
+  const isDemotionZone = currentUserRank >= leagueUsers.length - 2 && leagueUsers.length > 10;
 
-  const handleAddFriend = (e: React.FormEvent) => {
+  const handleAddFriend = async (e: React.FormEvent) => {
     e.preventDefault();
     const id = friendIdInput.trim().toUpperCase();
     if (!id) return;
 
-    if (id === userId) {
+    if (id === user.nidId) {
       alert("You cannot add yourself as a friend.");
       return;
     }
 
-    if (friendsList.some(f => f.id === id)) {
-      alert("This student is already in your friends list.");
-      return;
-    }
+    try {
+      // Find user by nidId
+      const q = query(collection(db, 'users'), where('nidId', '==', id), limit(1));
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        alert("Student not found. Please enter a valid NID student ID (e.g., NID-1234).");
+        return;
+      }
 
-    const realStudent = REAL_STUDENTS[id];
-    
-    if (realStudent) {
-      const newFriend = {
-        id: id,
-        name: realStudent.name,
-        xp: realStudent.xp,
-        streak: realStudent.streak,
-        isCurrentUser: false
-      };
-      setFriendsList([...friendsList, newFriend]);
+      const friendDoc = querySnapshot.docs[0];
+      const friendData = friendDoc.data() as UserProfile;
+
+      if (user.friends?.includes(friendData.uid)) {
+        alert("This student is already in your friends list.");
+        return;
+      }
+
+      // Add to friends list in Firestore
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        friends: arrayUnion(friendData.uid)
+      });
+
+      // Update local state immediately for better UX
+      setFriendsList(prev => [...prev, friendData].sort((a, b) => b.xp - a.xp));
       setFriendIdInput('');
       setIsAddingFriend(false);
-    } else {
-      alert("Student not found. Please enter a valid NID student ID (e.g., NID-7155).");
+      alert(`Added ${friendData.name} to your friends list!`);
+
+    } catch (error) {
+      console.error("Error adding friend:", error);
+      alert("An error occurred while adding the friend.");
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  const displayUsers = activeTab === 'league' 
+    ? leagueUsers 
+    : [...friendsList, user].sort((a, b) => b.xp - a.xp);
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -134,9 +184,9 @@ export function Leaderboard({ userXp, userStreak, userName, userId }: { userXp: 
           <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-4 shadow-inner">
             <Shield className="w-10 h-10" />
           </div>
-          <h2 className="text-3xl font-bold text-stone-900">Gold League</h2>
+          <h2 className="text-3xl font-bold text-stone-900">Global League</h2>
           <p className="text-stone-500 mt-2 font-medium flex items-center gap-2">
-            <Clock className="w-4 h-4" /> 2 days left in this week
+            <Clock className="w-4 h-4" /> Compete with NID aspirants worldwide
           </p>
         </div>
       </div>
@@ -161,9 +211,9 @@ export function Leaderboard({ userXp, userStreak, userName, userId }: { userXp: 
       {activeTab === 'league' && (
         <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 text-center">
           <p className="text-indigo-700 font-bold">
-            {isPromotionZone ? "🔥 You're in the promotion zone! Keep it up to reach Platinum League." :
-             isDemotionZone ? "⚠️ You're at risk of demotion. Complete a daily challenge to move up!" :
-             "💪 You're doing great! One more habit today can push you into the top 9."}
+            {isPromotionZone ? "🔥 You're in the top 9! Keep it up to stay at the top." :
+             isDemotionZone ? "⚠️ You're at risk of falling behind. Complete a daily challenge to move up!" :
+             "💪 You're doing great! One more habit today can push you higher."}
           </p>
         </div>
       )}
@@ -222,30 +272,31 @@ export function Leaderboard({ userXp, userStreak, userName, userId }: { userXp: 
         </div>
         
         <div className="divide-y divide-stone-100">
-          {(activeTab === 'league' ? allUsers : [...friendsList, { id: 'me', name: userName, xp: userXp, streak: userStreak, isCurrentUser: true }].sort((a, b) => b.xp - a.xp)).map((user, index) => {
+          {displayUsers.map((u, index) => {
             const rank = index + 1;
             const isTop9 = rank <= 9;
-            const isBottom3 = activeTab === 'league' && rank >= allUsers.length - 2;
+            const isBottom3 = activeTab === 'league' && rank >= displayUsers.length - 2 && displayUsers.length > 10;
+            const isCurrentUser = u.uid === user.uid;
             
             return (
               <motion.div 
-                key={user.id}
+                key={u.uid}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className={`p-4 grid grid-cols-[72px_1fr_80px_80px] gap-4 items-center transition-colors ${user.isCurrentUser ? 'bg-indigo-50/50' : 'hover:bg-stone-50'}`}
+                className={`p-4 grid grid-cols-[72px_1fr_80px_80px] gap-4 items-center transition-colors ${isCurrentUser ? 'bg-indigo-50/50' : 'hover:bg-stone-50'}`}
               >
                 <div className="flex justify-center">
                   <SpecialBadge rank={rank} />
                 </div>
                 
                 <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${user.isCurrentUser ? 'bg-indigo-600' : (user as any).isGroup ? 'bg-emerald-500' : 'bg-stone-300'}`}>
-                    {(user as any).isGroup ? <Users className="w-5 h-5" /> : user.name.charAt(0).toUpperCase()}
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${isCurrentUser ? 'bg-indigo-600' : 'bg-stone-300'}`}>
+                    {u.name.charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <p className={`font-bold ${user.isCurrentUser ? 'text-indigo-900' : 'text-stone-900'}`}>
-                      {user.name} {user.isCurrentUser && '(You)'}
+                    <p className={`font-bold ${isCurrentUser ? 'text-indigo-900' : 'text-stone-900'}`}>
+                      {u.name} {isCurrentUser && '(You)'}
                     </p>
                     {activeTab === 'league' && (
                       <p className="text-xs font-medium text-stone-500 flex items-center gap-1">
@@ -258,14 +309,14 @@ export function Leaderboard({ userXp, userStreak, userName, userId }: { userXp: 
                 </div>
                 
                 <div className="text-center font-bold text-stone-700">
-                  {user.xp}
+                  {u.xp}
                 </div>
                 
                 <div className="flex justify-center">
-                  {user.streak !== undefined ? (
-                    <div className={`flex items-center gap-1 font-bold text-sm px-2 py-1 rounded-lg ${user.streak > 0 ? 'bg-orange-50 text-orange-500' : 'text-stone-400'}`}>
-                      <Flame className={`w-4 h-4 ${user.streak > 0 ? 'fill-current' : ''}`} />
-                      {user.streak}
+                  {u.streak !== undefined ? (
+                    <div className={`flex items-center gap-1 font-bold text-sm px-2 py-1 rounded-lg ${u.streak > 0 ? 'bg-orange-50 text-orange-500' : 'text-stone-400'}`}>
+                      <Flame className={`w-4 h-4 ${u.streak > 0 ? 'fill-current' : ''}`} />
+                      {u.streak}
                     </div>
                   ) : (
                     <span className="text-stone-300">-</span>

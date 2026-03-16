@@ -1,0 +1,68 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId} (matches auth.uid)
+    // Fields:
+    //   - uid: string (required) - User's Firebase Auth UID
+    //   - name: string (required) - User's display name
+    //   - nidId: string (required) - User's unique NID student ID
+    //   - xp: number (required) - User's total XP
+    //   - streak: number (required) - User's current streak
+    //   - roadmapLevel: number (required) - User's current roadmap level
+    //   - friends: list of strings (required) - List of friend uids
+    //   - lastActive: string (required) - Last active timestamp
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid;
+    }
+    
+    function uidNotModified() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == resource.data.uid;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+    
+    function isValidUser(data) {
+      return hasRequiredFields(['uid', 'name', 'nidId', 'xp', 'streak', 'roadmapLevel', 'friends', 'lastActive']) &&
+             data.uid is string && data.uid.size() > 0 && data.uid.size() < 100 &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.nidId is string && data.nidId.size() > 0 && data.nidId.size() < 50 &&
+             data.xp is number && data.xp >= 0 &&
+             data.streak is number && data.streak >= 0 &&
+             data.roadmapLevel is number && data.roadmapLevel >= 1 &&
+             data.friends is list && data.friends.size() <= 500 &&
+             data.lastActive is string && data.lastActive.size() < 100;
+    }
+
+    match /users/{userId} {
+      // Anyone authenticated can read user profiles for the leaderboard
+      allow read: if isAuthenticated();
+      
+      // Users can only create their own profile
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && uidUnchanged();
+      
+      // Users can only update their own profile
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && uidNotModified();
+    }
+  }
+}

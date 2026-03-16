@@ -1,0 +1,56 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "A student's profile containing their stats and friends.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "The user's Firebase Auth UID."
+        },
+        "name": {
+          "type": "string",
+          "description": "The user's display name."
+        },
+        "nidId": {
+          "type": "string",
+          "description": "The user's unique NID student ID."
+        },
+        "xp": {
+          "type": "number",
+          "description": "The user's total XP."
+        },
+        "streak": {
+          "type": "number",
+          "description": "The user's current streak."
+        },
+        "roadmapLevel": {
+          "type": "number",
+          "description": "The user's current roadmap level."
+        },
+        "friends": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of friend uids."
+        },
+        "lastActive": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last active timestamp."
+        }
+      },
+      "required": ["uid", "name", "nidId", "xp", "streak", "roadmapLevel", "friends", "lastActive"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserProfile"
+      },
+      "description": "Stores user profiles."
+    }
+  }
+}

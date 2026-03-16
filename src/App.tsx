@@ -29,14 +29,20 @@ const DEFAULT_HABITS: Habit[] = [
   }
 ];
 
-function LandingPage({ onStart, onLogin }: { onStart: (name: string) => void, onLogin: (id: string, name: string) => void }) {
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, User } from 'firebase/auth';
+import { auth, db } from './firebase';
+import { doc, getDoc, setDoc, onSnapshot, updateDoc } from 'firebase/firestore';
+
+function LandingPage() {
   const [mode, setMode] = useState<'new' | 'returning' | 'generated'>('new');
   const [name, setName] = useState('');
   const [studentId, setStudentId] = useState('');
   const [generatedId, setGeneratedId] = useState('');
   const [copied, setCopied] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleCreate = () => {
+  const handleGenerate = () => {
     if (!name.trim()) return;
     const newId = `NID-${Math.floor(1000 + Math.random() * 9000)}`;
     setGeneratedId(newId);
@@ -49,9 +55,49 @@ function LandingPage({ onStart, onLogin }: { onStart: (name: string) => void, on
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleLogin = () => {
-    if (!name.trim() || !studentId.trim()) return;
-    onLogin(studentId.trim(), name.trim());
+  const handleContinueNew = async () => {
+    setLoading(true);
+    setError('');
+    const email = `${generatedId.toLowerCase()}@momentum.app`;
+    const password = generatedId;
+
+    try {
+      const userCred = await createUserWithEmailAndPassword(auth, email, password);
+      const newProfile: UserProfile = {
+        id: userCred.user.uid,
+        uid: userCred.user.uid,
+        name: name.trim(),
+        nidId: generatedId,
+        xp: 0,
+        streak: 0,
+        roadmapLevel: 1,
+        friends: [],
+        lastActive: new Date().toISOString()
+      };
+      await setDoc(doc(db, 'users', userCred.user.uid), newProfile);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Failed to create account. Please ensure Email/Password auth is enabled in Firebase.');
+      setLoading(false);
+    }
+  };
+
+  const handleLogin = async () => {
+    if (!studentId.trim()) return;
+    setLoading(true);
+    setError('');
+    
+    const id = studentId.trim().toUpperCase();
+    const email = `${id.toLowerCase()}@momentum.app`;
+    const password = id;
+
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (err: any) {
+      console.error(err);
+      setError('Invalid Student ID or account not found.');
+      setLoading(false);
+    }
   };
 
   return (
@@ -76,11 +122,11 @@ function LandingPage({ onStart, onLogin }: { onStart: (name: string) => void, on
                 placeholder="Enter your name"
                 value={name}
                 onChange={e => setName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleCreate()}
+                onKeyDown={e => e.key === 'Enter' && handleGenerate()}
                 className="w-full px-4 py-4 rounded-2xl border-2 border-stone-100 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 outline-none text-center text-lg font-medium transition-all"
               />
               <button
-                onClick={handleCreate}
+                onClick={handleGenerate}
                 disabled={!name.trim()}
                 className="w-full py-4 bg-stone-900 text-white rounded-2xl font-bold text-lg hover:bg-stone-800 disabled:opacity-50 transition-colors shadow-md"
               >
@@ -109,6 +155,7 @@ function LandingPage({ onStart, onLogin }: { onStart: (name: string) => void, on
             </div>
 
             <div className="space-y-3">
+              {error && <p className="text-red-500 text-sm font-medium">{error}</p>}
               <button
                 onClick={handleCopy}
                 className="w-full py-4 bg-stone-100 text-stone-900 rounded-2xl font-bold text-lg hover:bg-stone-200 transition-colors flex items-center justify-center gap-2"
@@ -116,10 +163,11 @@ function LandingPage({ onStart, onLogin }: { onStart: (name: string) => void, on
                 {copied ? <><CheckCircle2 className="w-5 h-5 text-emerald-600" /> Copied!</> : <><Copy className="w-5 h-5" /> Copy ID</>}
               </button>
               <button
-                onClick={() => onStart(name.trim())}
-                className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold text-lg hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-200"
+                onClick={handleContinueNew}
+                disabled={loading}
+                className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold text-lg hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-200 disabled:opacity-50"
               >
-                Continue
+                {loading ? 'Creating Account...' : 'Continue'}
               </button>
             </div>
           </div>
@@ -129,17 +177,11 @@ function LandingPage({ onStart, onLogin }: { onStart: (name: string) => void, on
           <div className="space-y-6 animate-in slide-in-from-left-8 duration-300">
             <div>
               <h2 className="text-2xl font-bold text-stone-900">Welcome Back</h2>
-              <p className="text-stone-500 mt-2 font-medium">Enter your details to continue.</p>
+              <p className="text-stone-500 mt-2 font-medium">Enter your Student ID to continue.</p>
             </div>
             
             <div className="space-y-4">
-              <input
-                type="text"
-                placeholder="Your Name"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                className="w-full px-4 py-4 rounded-2xl border-2 border-stone-100 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 outline-none text-center text-lg font-medium transition-all"
-              />
+              {error && <p className="text-red-500 text-sm font-medium">{error}</p>}
               <input
                 type="text"
                 placeholder="Student ID (e.g., NID-1234)"
@@ -150,10 +192,10 @@ function LandingPage({ onStart, onLogin }: { onStart: (name: string) => void, on
               />
               <button
                 onClick={handleLogin}
-                disabled={!name.trim() || !studentId.trim()}
+                disabled={!studentId.trim() || loading}
                 className="w-full py-4 bg-stone-900 text-white rounded-2xl font-bold text-lg hover:bg-stone-800 disabled:opacity-50 transition-colors shadow-md"
               >
-                Log In
+                {loading ? 'Logging In...' : 'Log In'}
               </button>
               <button 
                 onClick={() => setMode('new')}
@@ -170,10 +212,9 @@ function LandingPage({ onStart, onLogin }: { onStart: (name: string) => void, on
 }
 
 export default function App() {
-  const [user, setUser] = useState<UserProfile | null>(() => {
-    const saved = localStorage.getItem('momentum_user');
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [authReady, setAuthReady] = useState(false);
 
   const [habits, setHabits] = useState<Habit[]>(() => {
     const saved = localStorage.getItem('momentum_habits');
@@ -198,43 +239,38 @@ export default function App() {
   const challengeCompletedToday = lastChallengeDate === todayStr;
 
   useEffect(() => {
-    if (user) {
-      localStorage.setItem('momentum_user', JSON.stringify(user));
-    }
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      setAuthUser(firebaseUser);
+      if (!firebaseUser) {
+        setUser(null);
+      }
+      setAuthReady(true);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!authUser) return;
+    const userRef = doc(db, 'users', authUser.uid);
+    const unsubscribe = onSnapshot(userRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setUser(docSnap.data() as UserProfile);
+      }
+    });
+    return () => unsubscribe();
+  }, [authUser]);
+
+  useEffect(() => {
     localStorage.setItem('momentum_habits', JSON.stringify(habits));
     localStorage.setItem('momentum_logs', JSON.stringify(logs));
     if (lastChallengeDate) {
       localStorage.setItem('momentum_last_challenge', lastChallengeDate);
     }
-  }, [user, habits, logs, lastChallengeDate]);
+  }, [habits, logs, lastChallengeDate]);
 
-  const handleStart = (name: string) => {
-    setUser({
-      id: `NID-${Math.floor(1000 + Math.random() * 9000)}`,
-      name,
-      xp: 0,
-      streak: 0,
-      lastActive: new Date().toISOString(),
-      roadmapLevel: 1
-    });
-  };
-
-  const handleLogin = (id: string, name: string) => {
-    // In a real app, this would fetch from a database.
-    // Here we just mock a successful login with the provided ID and name.
-    setUser({
-      id,
-      name,
-      xp: 0,
-      streak: 0,
-      lastActive: new Date().toISOString(),
-      roadmapLevel: 1
-    });
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('momentum_user');
-    setUser(null);
+  const handleLogout = async () => {
+    await signOut(auth);
   };
 
   const handleBackup = () => {
@@ -264,17 +300,20 @@ export default function App() {
     }
   };
 
-  const handleTaskComplete = (xp: number, isDailyChallenge = false) => {
+  const handleTaskComplete = async (xp: number, isDailyChallenge = false) => {
     if (!user) return;
     
-    setUser(prev => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        xp: prev.xp + xp,
-        streak: prev.streak + 1,
-        roadmapLevel: isDailyChallenge ? prev.roadmapLevel : prev.roadmapLevel + 1
-      };
+    const newXp = user.xp + xp;
+    const newStreak = user.streak + 1;
+    const newLevel = isDailyChallenge ? user.roadmapLevel : user.roadmapLevel + 1;
+
+    // Update Firestore
+    const userRef = doc(db, 'users', user.uid);
+    await updateDoc(userRef, {
+      xp: newXp,
+      streak: newStreak,
+      roadmapLevel: newLevel,
+      lastActive: new Date().toISOString()
     });
 
     if (isDailyChallenge) {
@@ -295,13 +334,21 @@ export default function App() {
 
   const handleCopyId = () => {
     if (!user) return;
-    navigator.clipboard.writeText(user.id);
+    navigator.clipboard.writeText(user.nidId);
     setCopiedId(true);
     setTimeout(() => setCopiedId(false), 2000);
   };
 
+  if (!authReady) {
+    return (
+      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   if (!user) {
-    return <LandingPage onStart={handleStart} onLogin={handleLogin} />;
+    return <LandingPage />;
   }
 
   return (
@@ -426,12 +473,7 @@ export default function App() {
             />
           )}
           {currentTab === 'leaderboard' && (
-            <Leaderboard 
-              userXp={user.xp} 
-              userStreak={user.streak} 
-              userName={user.name} 
-              userId={user.id}
-            />
+            <Leaderboard user={user} />
           )}
           {currentTab === 'roadmap' && <Roadmap userLevel={user.roadmapLevel} onSelectNode={handleSelectNode} />}
           {currentTab === 'quiz' && <QuizEngine userLevel={user.roadmapLevel} onComplete={(xp) => handleTaskComplete(xp, false)} />}

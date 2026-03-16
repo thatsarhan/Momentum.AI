@@ -15,12 +15,15 @@ export interface DailyLog {
 }
 
 export interface UserProfile {
-  id: string;
+  id: string; // This will be the auth.uid
+  uid: string;
   name: string;
+  nidId: string;
   xp: number;
   streak: number;
   lastActive: string;
   roadmapLevel: number;
+  friends: string[];
 }
 
 export interface QuizQuestion {
