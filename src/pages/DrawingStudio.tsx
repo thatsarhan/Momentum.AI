@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Play, CheckCircle2, Upload, Maximize2, Image as ImageIcon, Sparkles, Loader2, Circle, Flame, Lock } from 'lucide-react';
 import { getGeminiClient } from '../lib/gemini';
@@ -79,9 +79,24 @@ const TUTORIALS = [
 ];
 
 export function DrawingStudio({ onComplete }: { onComplete: (xp: number) => void }) {
-  const [activeTutorial, setActiveTutorial] = useState(TUTORIALS[0]);
-  const [completedSteps, setCompletedSteps] = useState<number[]>([]);
-  const [uploaded, setUploaded] = useState(false);
+  const [activeTutorialId, setActiveTutorialId] = useState(() => {
+    return localStorage.getItem('momentum_active_tutorial') || TUTORIALS[0].id;
+  });
+  
+  const activeTutorial = TUTORIALS.find(t => t.id === activeTutorialId) || TUTORIALS[0];
+
+  const [completedStepsMap, setCompletedStepsMap] = useState<Record<string, number[]>>(() => {
+    const saved = localStorage.getItem('momentum_tutorial_steps');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  const [completedTutorials, setCompletedTutorials] = useState<string[]>(() => {
+    const saved = localStorage.getItem('momentum_completed_tutorials');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const completedSteps = completedStepsMap[activeTutorial.id] || [];
+  const uploaded = completedTutorials.includes(activeTutorial.id);
   
   // AI Reference Generator State
   const [prompt, setPrompt] = useState('');
@@ -89,23 +104,55 @@ export function DrawingStudio({ onComplete }: { onComplete: (xp: number) => void
   const [isGenerating, setIsGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
 
+  useEffect(() => {
+    localStorage.setItem('momentum_active_tutorial', activeTutorialId);
+  }, [activeTutorialId]);
+
+  useEffect(() => {
+    localStorage.setItem('momentum_tutorial_steps', JSON.stringify(completedStepsMap));
+  }, [completedStepsMap]);
+
+  useEffect(() => {
+    localStorage.setItem('momentum_completed_tutorials', JSON.stringify(completedTutorials));
+  }, [completedTutorials]);
+
   const toggleStep = (index: number) => {
-    if (completedSteps.includes(index)) {
-      setCompletedSteps(completedSteps.filter(i => i !== index));
-    } else {
-      setCompletedSteps([...completedSteps, index]);
-    }
+    setCompletedStepsMap(prev => {
+      const current = prev[activeTutorial.id] || [];
+      if (current.includes(index)) {
+        return { ...prev, [activeTutorial.id]: current.filter(i => i !== index) };
+      } else {
+        return { ...prev, [activeTutorial.id]: [...current, index] };
+      }
+    });
   };
 
   const handleUpload = () => {
-    // Simulate upload
-    setUploaded(true);
-    if (!completedSteps.includes(2)) {
-      setCompletedSteps([...completedSteps, 2]);
-    }
+    if (uploaded) return;
+
+    // Mark tutorial as completed
+    setCompletedTutorials(prev => [...prev, activeTutorial.id]);
+    
+    // Ensure the last step (usually upload) is checked
+    const lastStepIndex = activeTutorial.steps.length - 1;
+    setCompletedStepsMap(prev => {
+      const current = prev[activeTutorial.id] || [];
+      if (!current.includes(lastStepIndex)) {
+        return { ...prev, [activeTutorial.id]: [...current, lastStepIndex] };
+      }
+      return prev;
+    });
+
+    // Simulate upload delay and auto-advance
     setTimeout(() => {
       onComplete(activeTutorial.xp);
-    }, 1500);
+      
+      // Auto-advance to next tutorial
+      const currentIndex = TUTORIALS.findIndex(t => t.id === activeTutorial.id);
+      if (currentIndex < TUTORIALS.length - 1) {
+        setActiveTutorialId(TUTORIALS[currentIndex + 1].id);
+      }
+    }, 2000);
   };
 
   const handleGenerateReference = async () => {
@@ -149,12 +196,7 @@ export function DrawingStudio({ onComplete }: { onComplete: (xp: number) => void
   };
 
   const handleTutorialChange = (tutorialId: string) => {
-    const tutorial = TUTORIALS.find(t => t.id === tutorialId);
-    if (tutorial) {
-      setActiveTutorial(tutorial);
-      setCompletedSteps([]);
-      setUploaded(false);
-    }
+    setActiveTutorialId(tutorialId);
   };
 
   const progressPercentage = Math.round((completedSteps.length / activeTutorial.steps.length) * 100);
@@ -183,7 +225,7 @@ export function DrawingStudio({ onComplete }: { onComplete: (xp: number) => void
              <iframe 
                 width="100%" 
                 height="100%" 
-                src={activeTutorial.youtubeUrl} 
+                src={`${activeTutorial.youtubeUrl}&autoplay=1&rel=0`} 
                 title="YouTube video player" 
                 frameBorder="0" 
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 

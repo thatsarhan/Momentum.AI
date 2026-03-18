@@ -300,7 +300,7 @@ export default function App() {
     }
   };
 
-  const handleTaskComplete = async (xp: number, isDailyChallenge = false) => {
+  const handleTaskComplete = async (xp: number, isDailyChallenge = false, stayOnTab = false) => {
     if (!user) return;
     
     const newXp = user.xp + xp;
@@ -324,7 +324,9 @@ export default function App() {
     setShowStreakAnim(true);
     setTimeout(() => setShowStreakAnim(false), 3000);
     
-    setCurrentTab(isDailyChallenge ? 'dashboard' : 'roadmap');
+    if (!stayOnTab) {
+      setCurrentTab(isDailyChallenge ? 'dashboard' : 'roadmap');
+    }
   };
 
   const handleSelectNode = (type: string) => {
@@ -477,7 +479,7 @@ export default function App() {
           )}
           {currentTab === 'roadmap' && <Roadmap userLevel={user.roadmapLevel} onSelectNode={handleSelectNode} />}
           {currentTab === 'quiz' && <QuizEngine userLevel={user.roadmapLevel} onComplete={(xp) => handleTaskComplete(xp, false)} />}
-          {currentTab === 'drawing' && <DrawingStudio onComplete={(xp) => handleTaskComplete(xp, false)} />}
+          {currentTab === 'drawing' && <DrawingStudio onComplete={(xp) => handleTaskComplete(xp, false, true)} />}
           {currentTab === 'mentor' && <AIMentor />}
           {currentTab === 'habits' && <HabitManager habits={habits} setHabits={setHabits} />}
         </div>
